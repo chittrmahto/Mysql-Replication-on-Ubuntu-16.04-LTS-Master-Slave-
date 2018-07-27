@@ -1,0 +1,131 @@
+Mysql Replication on Ubuntu 16.04 LTS (Master-Slave)
+
+You need to install mysql server on both master and slave machine.
+
+Install MySql in both server.
+# sudo apt-get install mysql-server mysql-client
+
+Login to Master Server.
+Step 1. Edit & Modify the Configuration file of MySql  Server.
+
+# vim /etc/mysql/mysql.conf.d/mysqld.cnf
+bind-address = 127.0.0.1         #comment this line if you want to remotely access your server
+
+Add below lines at the end of the file.
+
+server-id = 1
+log_bin = /var/log/mysql/mysql-bin.log
+log_bin_index =/var/log/mysql/mysql-bin.log.index
+relay_log = /var/log/mysql/mysql-relay-bin
+relay_log_index = /var/log/mysql/mysql-relay-bin.index
+
+Step 2. Restart Mysql Server.
+# service mysql restart
+
+Step 3. Login to Mysql Server.
+# mysql -u root -p
+
+Step 4.  Create a new user for Replication and specify the Password to that user.
+mysql > create user 'myrepli'@'%' identified by 'password';
+mysql > GRANT REPLICATION SLAVE ON *.* TO 'myrepli'@'%';
+mysql > FLUSH PRIVILEGES;
+
+Step 5. Execute below command to view the File & Position of Master Server.
+mysql > show master status;
+
++------------------+----------+--------------+------------------+
+| File             | Position | Binlog_Do_DB | Binlog_Ignore_DB |
++------------------+----------+--------------+------------------+
+| mysql-bin.000001 |      107 |   |                  |
++------------------+----------+--------------+------------------+
+1 row in set (0.00 sec)
+
+Login to Slave Server.
+Step 6. Edit & Modify the Configuration file of MySql Server.
+
+vim /etc/mysql/mysql.conf.d/mysqld.cnf
+# bind-address = 127.0.0.1
+
+Add below lines at the end of the file.
+
+server-id = 2
+log_bin = /var/log/mysql/mysql-bin.log
+log_bin_index =/var/log/mysql/mysql-bin.log.index
+relay_log = /var/log/mysql/mysql-relay-bin
+relay_log_index = /var/log/mysql/mysql-relay-bin.index
+
+Step 7. Restart Mysql Server.
+# service mysql restart
+
+Step 8. Login to Mysql Server.
+# mysql -u root -p
+
+Step 9. Specify the following details as given below & make sure to Replace the following settings with your settings.
+MASTER_HOST     :   IP Address of Master server
+MASTER_USER     :   Replication User of Master server that we had created in previous steps.
+MASTER_PASSWORD :   Replication User Password of Master server that we had created in previous steps.
+MASTER_LOG_FILE :   Your Value of Master Log File of Master server.
+MASTER_LOG_POS  :   Your Value of Master Log Position of Master server.
+
+mysql > stop slave;
+mysql > CHANGE MASTER TO MASTER_HOST = 'master_ip', MASTER_USER = 'myrepli', MASTER_PASSWORD = 'password', MASTER_LOG_FILE = 'mysql-bin.000001', MASTER_LOG_POS = 107;
+mysql > start slave;
+
+Login to Master Server.
+Step 10. Login to Mysql Server
+# mysql -u root -p
+
+Step 11. For testing a Replication we need to create a new database, it will automatically replicate on Slave Server.
+mysql > create database testrepli;
+
+Login to Slave Server.
+Step 12. Login to Mysql Server
+# mysql -u root -p
+
+Step 13. View your Replicated Database  by using below command.
+mysql > show databases;
+
+
+You can install phpmyadmin to view mysql GUI.
+# apt-get install phpmyadmin
+
+--------+-------------------+----------------------+----------------------+----------------------+----------------------------+---------
+                Existing Database Replication
+--------+-------------------+----------------------+----------------------+----------------------+----------------------------+---------
+Login to Master Database.
+mysql > use databasename;
+
+Following that, lock the database to prevent any new changes:
+mysql > FLUSH TABLES WITH READ LOCK;
+
+Then type in:
+mysql > SHOW MASTER STATUS;
+
+You will see a table that should look something like this:
+mysql> SHOW MASTER STATUS;
++------------------+----------+--------------+------------------+
+| File             | Position | Binlog_Do_DB | Binlog_Ignore_DB |
++------------------+----------+--------------+------------------+
+| mysql-bin.000001 |      107 |  databasename  |                  |
++------------------+----------+--------------+------------------+
+1 row in set (0.00 sec)
+
+mysql > mysqldump -u root -p --opt databasename >  databasename.sql
+
+Now, returning to your your original window, unlock the databases (making them writeable again). Finish up by exiting the shell.
+mysql > UNLOCK TABLES;
+mysql > QUIT;
+
+Now you are all done with the configuration of the the master database.
+
+
+
+
+Login to Slave Database
+mysql > CREATE DATABASE databasename;
+mysql > EXIT;
+
+Import the database that you previously exported from the master database.
+mysql > mysql -u root -p databasename < /path/to/databasename.sql
+mysql > START SLAVE;
+mysql > SHOW SLAVE STATUS\G
